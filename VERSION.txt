@@ -1,0 +1,6 @@
+KAZAKHSTAN LIFE SIMULATOR
+Source build: 0.1.0
+Engine target: Godot 4.7.2 Android Editor
+Renderer: GL Compatibility
+Platform target: Android landscape
+Build artifact: Godot source project (APK not exported)
