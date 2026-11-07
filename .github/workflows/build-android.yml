@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
+          wget -O templates.tpz \
+          https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          unzip templates.tpz -d templates
+          cp templates/templates/android_debug.apk \
+          ~/.local/share/godot/export_templates/4.7.2.stable/android_debug.apk
+
+      - name: Build APK
+        run: |
+          godot --headless --path . \
+          --export-debug "Android" game.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kazakhstan-Life-Simulator-APK
+          path: game.apk
+          
