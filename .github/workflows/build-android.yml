@@ -1,44 +1,108 @@
+
 name: Build Android APK
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build Kazakhstan Life Simulator
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # 1. Download project
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Install Java
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 3. Install Godot and matching export templates
       - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.7.2
           use-dotnet: false
+          include-templates: true
 
+      # 4. Install Android SDK
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
-      - name: Install export templates
+      # 5. Find Godot project
+      - name: Find project folder
+        shell: bash
         run: |
-          mkdir -p ~/.local/share/godot/export_templates/4.7.2.stable
-          wget -O templates.tpz \
-          https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
-          unzip templates.tpz -d templates
-          cp templates/templates/android_debug.apk \
-          ~/.local/share/godot/export_templates/4.7.2.stable/android_debug.apk
+          PROJECT_FILE=$(find . -name project.godot \
+            -not -path './.git/*' -print -quit)
 
-      - name: Build APK
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "ERROR: project.godot not found"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Found project: $PROJECT_DIR"
+
+      # 6. Check Android export preset
+      - name: Check export preset
+        shell: bash
         run: |
-          godot --headless --path . \
-          --export-debug "Android" game.apk
+          if [ ! -f "$PROJECT_DIR/export_presets.cfg" ]; then
+            echo "ERROR: export_presets.cfg is missing"
+            echo "Create an Android export preset in Godot."
+            exit 1
+          fi
 
+          echo "Export preset found."
+
+      # 7. Verify tools
+      - name: Verify installations
+        run: |
+          godot --version
+          java -version
+          sdkmanager --version
+
+      # 8. Import project resources
+      - name: Import Godot project
+        run: |
+          godot --headless \
+            --editor \
+            --path "$PROJECT_DIR" \
+            --quit
+
+      # 9. Build APK
+      - name: Build Android APK
+        run: |
+          mkdir -p output
+
+          godot --headless \
+            --path "$PROJECT_DIR" \
+            --export-debug "Android" \
+            "$GITHUB_WORKSPACE/output/KazakhstanLifeSimulator.apk"
+
+      # 10. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kazakhstan-Life-Simulator-APK
-          path: game.apk
+          path: output/KazakhstanLifeSimulator.apk
+          if-no-files-found: error
+          retention-days: 14
           
